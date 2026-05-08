@@ -644,14 +644,16 @@ def main():
                 if hasattr(msg, 'name') and msg.name:  # ToolMessage
                     tool_name = msg.name
                     try:
-                        import json
+                        import json, ast
                         # Try to parse JSON content
                         content_str = msg.content if isinstance(msg.content, str) else str(msg.content)
                         try:
                             result = json.loads(content_str)
                         except (json.JSONDecodeError, TypeError):
-                            # If not JSON, treat as string
-                            result = content_str
+                            try:
+                                result = ast.literal_eval(content_str)
+                            except (ValueError, SyntaxError):
+                                result = content_str
                         
                         # Handle retrieve_game results (list of dicts)
                         if tool_name == "retrieve_game":
@@ -676,12 +678,11 @@ def main():
                                 num_docs_val = result.get("num_documents", result.get("num_docs", 0))
                                 eval_desc = result.get("description", "")
                                 
-                                if confidence_val is not None:
-                                    confidence = confidence_val
+                                confidence = confidence_val  # always capture, even if 0.0
                                 
+                                conf_str = f"{confidence_val:.3f}" if confidence_val is not None else "N/A"
                                 reasoning_steps.append(
-                                    f"→ Evaluation: useful={useful}, confidence={confidence_val:.3f if confidence_val is not None else 'N/A'}, "
-                                    f"documents={num_docs_val}"
+                                    f"→ Evaluation: useful={useful} | confidence={conf_str} | documents={num_docs_val}"
                                 )
                                 if eval_desc:
                                     reasoning_steps.append(f"  Reasoning: {eval_desc[:150]}{'...' if len(eval_desc) > 150 else ''}")
@@ -731,8 +732,8 @@ def main():
             
             print(f"\n[METADATA]")
             print(f"Source: {source_type}")
-            if confidence is not None:
-                print(f"Confidence: {confidence:.3f}")
+            conf_display = f"{confidence:.3f}" if confidence is not None else "N/A"
+            print(f"Confidence: {conf_display}")
             if num_docs > 0:
                 print(f"Documents retrieved: {num_docs}")
             
